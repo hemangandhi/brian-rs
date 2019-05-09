@@ -1,0 +1,10 @@
+[package]
+name = "brian-rs"
+version = "0.1.0"
+authors = ["Heman Gandhi <hemangandhi@gmail.com>"]
+edition = "2018"
+
+[lib]
+proc-macro = true
+
+[dependencies]
