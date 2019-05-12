@@ -9,3 +9,4 @@ proc-macro = true
 
 [dependencies]
 dimensioned = "0.7.0"
+syn = "0.15.34"

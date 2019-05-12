@@ -126,7 +126,7 @@ impl Izekhevich{
 }
 
 impl SpikeGenerator for Izekehvich {
-    pub fn did_spike(&self) {
+    pub fn did_spike(&self) -> bool {
         self.v > 30 * si::mV
     }
 
