@@ -1,52 +1,53 @@
 extern crate dimensioned as dim;
 
+use std::ops::AddAssign;
+
 use dim::dimensions;
 use dim::si;
-use std::vec;
 
-pub mod spike_generator{
-    pub trait SpikeGenerator{
-        pub fn did_spike(&self) -> bool;
-        pub fn try_advance(&mut self, dt: impl dimensions::Time) -> bool;
+pub trait SpikeGenerator {
+    fn did_spike(&self) -> bool;
+    fn try_advance(&mut self, dt: si::Second<f64>) -> bool;
 
-        pub fn advance_and_check(&mut self, dt: impl dimensions::Time) -> Option<bool> {
-            if(!self.try_advance(dt)){
-                Option::None
-            }else{
-                Option::Some(self.did_spike())
-            }
+    fn advance_and_check(&mut self, dt: si::Second<f64>) -> Option<bool> {
+        if !self.try_advance(dt) {
+            Option::None
+        } else {
+            Option::Some(self.did_spike())
         }
     }
+}
 
-    pub trait SpikeGeneratorWithInput<Input: dimensions::Current>: SpikeGenerator{
-        pub fn handle_input(&mut self, input: Input, dt: impl dimensions::Time);
-    }
+pub trait SpikeGeneratorWithInput<Input: dimensions::Current>: SpikeGenerator {
+    fn handle_input(&mut self, input: Input, dt: impl dimensions::Time);
+}
 
-    pub struct SpikeAtTimes<T>{
-        times: Vec<T>,
-        time: T,
-        idx: u32
-    }
+pub struct SpikeAtTimes<T> {
+    times: Vec<T>,
+    time: T,
+    idx: usize,
+}
 
-    impl<T: dimensions::Time + From<si::Second<f64>>> SpikeAtTimes{
-        pub fn new(Vec<T> times) -> SpikeAtTimes{
-            SpikeAtTimes{
-                times: times,
-                time: (0 * si::S).into(),
-                idx: 0
-            }
+impl<T: dimensions::Time + From<si::Second<f64>>> SpikeAtTimes<T> {
+    pub fn new(times: Vec<T>) -> SpikeAtTimes<T> {
+        SpikeAtTimes {
+            times: times,
+            time: (0.0 * si::S).into(),
+            idx: 0,
         }
     }
+}
 
-    impl<T: dimensions::Time + From<si::Second<f64>>> SpikeGenerator for SpikeAtTimes<T>{
-        pub fn did_spike(&self){
-            return self.idx < self.times.len() && self.times[self.idx] == self.time;
-        }
+impl<T: dimensions::Time + From<si::Second<f64>> + AddAssign + PartialOrd> SpikeGenerator for SpikeAtTimes<T> {
+    fn did_spike(&self) -> bool {
+        return self.idx < self.times.len() && self.times[self.idx] == self.time;
+    }
 
-        pub fn try_advance(&mut self, dt: impl dimensions::Time) -> bool {
-            self.time += dt.into();
-            while (self.idx < self.times.len() && self.times[self.idx] < self.time) self.idx++;
-            true
+    fn try_advance(&mut self, dt: si::Second<f64>) -> bool {
+        self.time += dt.into();
+        while self.idx < self.times.len() && self.times[self.idx] < self.time {
+            self.idx += 1;
         }
+        true
     }
 }

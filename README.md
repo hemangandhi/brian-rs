@@ -39,7 +39,7 @@ by `si::Hz`. These would be in the format `<ident>'`.
 
 
 ```
-neuron := <ident>, params {
+neuron := <type>, params {
              <list of types>
          },
          initialize {
