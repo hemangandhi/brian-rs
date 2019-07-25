@@ -7,3 +7,4 @@ edition = "2018"
 [dependencies]
 dimensioned = "0.7.0"
 syn = "0.15.34"
+num-traits = "0.2.8"
