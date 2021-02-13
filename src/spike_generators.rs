@@ -1,15 +1,8 @@
 extern crate dimensioned as dim;
-extern crate num_traits as num;
 
 use dim::dimensions;
 use dim::si;
-use num::{NumAssignOps, NumOps};
 
-pub trait IntoSecond: dimensions::Time + From<si::Second<f64>> {}
-pub trait OrdNumber<T>:
-    NumOps<T, T> + std::ops::Neg<Output = T> + NumAssignOps<T> + PartialOrd
-{
-}
 
 pub trait SpikeGenerator {
     fn did_spike(&self) -> bool;
@@ -35,7 +28,7 @@ pub struct SpikeAtTimes<T> {
     idx: usize,
 }
 
-impl<T: IntoSecond> SpikeAtTimes<T> {
+impl<T: From<si::Second<f64>>> SpikeAtTimes<T> {
     pub fn new(times: Vec<T>, tolerance: T) -> SpikeAtTimes<T> {
         SpikeAtTimes {
             times: times,
@@ -46,9 +39,17 @@ impl<T: IntoSecond> SpikeAtTimes<T> {
     }
 }
 
-impl<T: IntoSecond + OrdNumber<T> + Clone> SpikeGenerator for SpikeAtTimes<T> {
+impl<T> SpikeGenerator for SpikeAtTimes<T>
+where
+    // TODO: alias this as a trait?    
+    T: From<si::Second<f64>>
+        + Clone
+        + PartialOrd<T>
+        + std::ops::AddAssign
+        + std::ops::Sub<Output = T>
+        + std::ops::Neg<Output = T>
+{
     fn did_spike(&self) -> bool {
-        // TODO: don't clone?
         let time_diff = self.times[self.idx].clone() - self.time.clone();
         return self.idx < self.times.len() && -self.error_tolerance.clone() < time_diff
             || time_diff < self.error_tolerance;
