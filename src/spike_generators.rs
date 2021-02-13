@@ -3,7 +3,6 @@ extern crate dimensioned as dim;
 use dim::dimensions;
 use dim::si;
 
-
 pub trait SpikeGenerator {
     fn did_spike(&self) -> bool;
     fn try_advance(&mut self, dt: si::Second<f64>) -> bool;
@@ -21,6 +20,7 @@ pub trait SpikeGeneratorWithInput<Input: dimensions::Current>: SpikeGenerator {
     fn handle_input(&mut self, input: Input, dt: impl dimensions::Time);
 }
 
+#[derive(Debug)]
 pub struct SpikeAtTimes<T> {
     times: Vec<T>,
     time: T,
@@ -41,18 +41,22 @@ impl<T: From<si::Second<f64>>> SpikeAtTimes<T> {
 
 impl<T> SpikeGenerator for SpikeAtTimes<T>
 where
-    // TODO: alias this as a trait?    
+    // TODO: alias this as a trait?
     T: From<si::Second<f64>>
-        + Clone
+        + Copy
         + PartialOrd<T>
         + std::ops::AddAssign
         + std::ops::Sub<Output = T>
-        + std::ops::Neg<Output = T>
+        + std::ops::Neg<Output = T>,
 {
     fn did_spike(&self) -> bool {
-        let time_diff = self.times[self.idx].clone() - self.time.clone();
-        return self.idx < self.times.len() && -self.error_tolerance.clone() < time_diff
-            || time_diff < self.error_tolerance;
+        let idx = if self.idx >= self.times.len() {
+            self.times.len() - 1
+        } else {
+            self.idx
+        };
+        let time_diff = self.times[idx] - self.time;
+        return -self.error_tolerance < time_diff && time_diff < self.error_tolerance;
     }
 
     fn try_advance(&mut self, dt: si::Second<f64>) -> bool {
