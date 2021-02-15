@@ -14,7 +14,6 @@ pub trait InputSpikeGenerator<I, T>: SpikeGenerator<I> {
 pub mod discrete {
     extern crate dimensioned as dim;
 
-    use dim::dimensions;
     use dim::si;
 
     #[derive(Debug)]
@@ -47,7 +46,7 @@ pub mod discrete {
             + std::ops::AddAssign
             + std::ops::Sub<Output = T>
             + std::ops::Neg<Output = T>,
-        I: From<si::Ampere<f64>> + Copy,
+        I: From<si::Volt<f64>> + Copy,
     {
         fn did_spike(&self) -> bool {
             let idx = if self.idx >= self.times.len() {
@@ -63,7 +62,7 @@ pub mod discrete {
             if self.did_spike() {
                 self.spike_current.into()
             } else {
-                (0.0 * si::A).into()
+                (0.0 * si::V).into()
             }
         }
     }
@@ -77,7 +76,7 @@ pub mod discrete {
             + std::ops::AddAssign
             + std::ops::Sub<Output = T>
             + std::ops::Neg<Output = T>,
-        I: From<si::Ampere<f64>> + Copy,
+        I: From<si::Volt<f64>> + Copy,
     {
         fn advance(&mut self, dt: T) {
             self.time += dt.into();
@@ -91,35 +90,54 @@ pub mod discrete {
 pub mod continuous {
     extern crate dimensioned as dim;
 
-    use dim::dimensions;
     use dim::si;
 
-    #[derive(Debug)]
-    pub struct ContinuousEquivalent<D, T, I> {
-        last_spike: T,
-        spike_time_scale: f64,
-        spike_decay_scale: f64,
+    pub struct WithSpikeDecay<D, T, I> {
+        time_since_spike: T,
         discrete_neuron: D,
         spike_current: I,
+        spiked_yet: bool,
+        spike_decay_fn: Box<dyn Fn(T, I) -> I>,
     }
 
-    impl<T: From<si::Second<f64>>, D, I: From<si::Ampere<f64>>> ContinuousEquivalent<D, T, I> {
-        pub fn new(discrete_neuron: D, time_scale: f64, decay_scale: f64) -> Self {
-            ContinuousEquivalent {
-                last_spike: (0.0 * si::S).into(),
-                spike_time_scale: time_scale,
-                spike_decay_scale: decay_scale,
+    impl<T, D, I> WithSpikeDecay<D, T, I>
+    where
+        T: From<si::Second<f64>> + Into<si::Second<f64>> + Copy,
+        I: From<si::Volt<f64>> + Into<si::Volt<f64>> + Copy,
+    {
+        pub fn new(discrete_neuron: D, spike_decay_fn: Box<dyn Fn(T, I) -> I>) -> Self {
+            WithSpikeDecay {
+                time_since_spike: (0.0 * si::S).into(),
                 discrete_neuron: discrete_neuron,
-                spike_current: (0.0 * si::A).into(),
+                spike_current: (0.0 * si::V).into(),
+                spiked_yet: false,
+                spike_decay_fn: spike_decay_fn,
             }
+        }
+
+        pub fn exp_decay(
+            discrete_neuron: D,
+            spike_decay_scalar: f64,
+            spike_timing_scalar: f64,
+        ) -> Self {
+            Self::new(
+                discrete_neuron,
+                Box::new(move |time: T, spike: I| {
+                    ((-(time.into() / si::S) * spike_timing_scalar).exp()
+                        * (spike.into() / si::V)
+                        * spike_decay_scalar
+                        * si::V)
+                        .into()
+                }),
+            )
         }
     }
 
-    impl<D, T, I> super::SpikeGenerator<I> for ContinuousEquivalent<D, T, I>
+    impl<D, T, I> super::SpikeGenerator<I> for WithSpikeDecay<D, T, I>
     where
         D: super::SpikeGenerator<I>,
         T: Into<si::Second<f64>> + Copy,
-        I: From<si::Ampere<f64>> + Into<si::Ampere<f64>> + Copy,
+        I: From<si::Volt<f64>> + Into<si::Volt<f64>> + Copy,
     {
         fn did_spike(&self) -> bool {
             self.discrete_neuron.did_spike()
@@ -127,21 +145,29 @@ pub mod continuous {
         fn get_current(&self) -> I {
             if self.did_spike() {
                 self.discrete_neuron.get_current()
+            } else if !self.spiked_yet {
+                (0.0 * si::V).into()
             } else {
-                ((self.last_spike.into() / si::S * self.spike_time_scale).exp()
-                    * self.spike_decay_scale
-                    * self.spike_current.into())
-                .into()
+                (*self.spike_decay_fn)(self.time_since_spike, self.spike_current)
             }
         }
     }
 
-    impl<D, T, I> super::InputSpikeGenerator<I, T> for ContinuousEquivalent<D, T, I>
+    impl<D, T, I> super::InputSpikeGenerator<I, T> for WithSpikeDecay<D, T, I>
     where
         D: super::InputSpikeGenerator<I, T>,
-        T: From<si::Second<f64>> + Into<si::Second<f64>> + Copy,
-        I: From<si::Ampere<f64>> + Into<si::Ampere<f64>> + Copy,
+        T: From<si::Second<f64>> + Into<si::Second<f64>> + Copy + std::ops::AddAssign,
+        I: From<si::Volt<f64>> + Into<si::Volt<f64>> + Copy,
     {
-        fn advance(&mut self, dt: T) {}
+        fn advance(&mut self, dt: T) {
+            self.discrete_neuron.advance(dt);
+            if self.discrete_neuron.did_spike() {
+                self.spiked_yet = true;
+                self.time_since_spike = (0.0 * si::S).into();
+                self.spike_current = self.discrete_neuron.get_current();
+                return;
+            }
+            self.time_since_spike += dt;
+        }
     }
 }
