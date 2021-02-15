@@ -15,8 +15,9 @@ pub mod discrete {
     extern crate dimensioned as dim;
 
     use dim::si;
+    use std::cmp::Ordering;
 
-    use super::{SpikeGenerator, InputSpikeGenerator};
+    use super::{InputSpikeGenerator, SpikeGenerator};
 
     #[derive(Debug)]
     pub struct SpikeAtTimes<T, I> {
@@ -88,8 +89,18 @@ pub mod discrete {
         }
     }
 
+    /// A neuron that will spike a given number of times between certain time
+    /// slots. (So it only means "rate" if the slot is one unit long.) This is
+    /// implemented by taking slots from "rate_at_time" and spiking that many
+    /// times in that slot.
+    ///
+    /// "tolerance" is an implementation detail, but an important one: since
+    /// slots are subdivided to ensure the correct number of spikes in the slot
+    /// the tolerance is "how far from the starting of a sub-slot should the
+    /// spike be within." Hence, for a tolerance t, you want to advance in a
+    /// step t < dt < 2t to be sure that you hit every spike exactly once.
     pub struct SpikeAtRate<T, I> {
-        rate_at_time: Box<dyn Fn(T) -> (i32, T)>,
+        rate_at_time: Box<dyn Fn(T) -> Option<(i32, T)>>,
         time: T,
         slot_start_time: T,
         slot_end_time: T,
@@ -99,15 +110,70 @@ pub mod discrete {
         tolerance: T,
     }
 
+    impl<T, I> SpikeAtRate<T, I>
+    where
+        T: From<si::Second<f64>> + PartialOrd + Copy,
+    {
+        pub fn new(
+            rate_fn: Box<dyn Fn(T) -> Option<(i32, T)>>,
+            slot_end_time: T,
+            spike_current: I,
+            starting_rate: i32,
+            tolerance: T,
+        ) -> Self {
+            SpikeAtRate {
+                rate_at_time: rate_fn,
+                time: (0.0 * si::S).into(),
+                slot_start_time: (0.0 * si::S).into(),
+                slot_end_time: slot_end_time,
+                spike_current: spike_current,
+                current_rate: starting_rate,
+                num_spiked: 0,
+                tolerance: tolerance,
+            }
+        }
+
+        pub fn rate_fn_of_times<'a>(
+            slot_starts_to_rate: &'a mut Vec<(T, i32)>,
+        ) -> Box<dyn Fn(T) -> Option<(i32, T)> + 'a> {
+            slot_starts_to_rate.sort_unstable_by(|a, b| {
+                let (t1, r1) = a;
+                let (t2, r2) = b;
+                match t1.partial_cmp(t2) {
+                    Option::None | Option::Some(Ordering::Equal) => r1.cmp(r2),
+                    Option::Some(x) => x,
+                }
+            });
+            Box::new(move |time: T| {
+                let slot: Vec<&(T, i32)> = (*slot_starts_to_rate)
+                    .iter()
+                    .filter(|slt| time > slt.0)
+                    .take(1)
+                    .collect();
+                if slot.len() == 0 {
+                    return Option::None;
+                }
+                let (new_slot_end, new_rate) = slot[0];
+                return Option::Some((*new_rate, *new_slot_end));
+            })
+        }
+    }
+
     impl<T, I> SpikeGenerator<I> for SpikeAtRate<T, I>
     where
         T: Into<si::Second<f64>> + Copy + std::ops::Sub<Output = T>,
         I: From<si::Volt<f64>> + Copy,
     {
         fn did_spike(&self) -> bool {
-            let spike_interval_len: si::Second<f64> = ((self.slot_end_time - self.slot_start_time).into())
-                / (self.current_rate as f64);
-            spike_interval_len * (self.num_spiked as f64) < self.tolerance.into()
+            if self.current_rate <= 0 {
+                return false;
+            }
+            let spike_interval_len: si::Second<f64> =
+                ((self.slot_end_time - self.slot_start_time).into()) / (self.current_rate as f64);
+            let adjusted_time = self.time.into()
+                - spike_interval_len * (self.num_spiked as f64)
+                - self.slot_start_time.into();
+            0.0 * si::S < adjusted_time && adjusted_time <= self.tolerance.into()
         }
 
         fn get_current(&self) -> I {
@@ -121,22 +187,35 @@ pub mod discrete {
 
     impl<T, I> InputSpikeGenerator<I, T> for SpikeAtRate<T, I>
     where
-        T: Into<si::Second<f64>> + Copy + std::ops::Sub<Output = T> + std::ops::AddAssign + PartialOrd<T>,
+        T: Into<si::Second<f64>>
+            + Copy
+            + std::ops::Sub<Output = T>
+            + std::ops::AddAssign
+            + PartialOrd<T>,
         I: From<si::Volt<f64>> + Copy,
     {
         fn advance(&mut self, dt: T) {
-	    self.time += dt;
-	    if self.time > self.slot_end_time {
-		self.slot_start_time = self.slot_end_time;
-		let (new_rate, new_end) = (*self.rate_at_time)(self.time);
-		self.current_rate = new_rate;
-		self.slot_end_time = new_end;
-		self.num_spiked = 0;
-	    }
-	    if self.did_spike() {
-		self.num_spiked += 1;
-	    }
-	}
+            // We move the "spiked" counter first since the more usual usage
+	    // pattern would need to read whether the neuron spiked after
+	    // advancing and doing this state change after the ones below
+	    // would actually mean that checking "did_spike" in a loop would
+	    // actually miss every spike since this check would incorrectly
+	    // increment self.num_spiked.
+            if self.did_spike() {
+                self.num_spiked += 1;
+            }
+            self.time += dt;
+            if self.time > self.slot_end_time && self.current_rate > -1 {
+                self.slot_start_time = self.slot_end_time;
+                if let Option::Some((new_rate, new_end)) = (*self.rate_at_time)(self.time) {
+                    self.current_rate = new_rate;
+                    self.slot_end_time = new_end;
+                    self.num_spiked = 0;
+                } else {
+                    self.current_rate = -1;
+                }
+            }
+        }
     }
 }
 
