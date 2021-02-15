@@ -31,7 +31,7 @@ mod tests {
 	// in the function, so this is perhaps the best I can do since I can't cleverly
 	// express a higher-kinded type without more pain. Furthermore, "euler" is
 	// configured in a strange way so that it supplies a 0 current until it spikes,
-	// supplying a 0.5 voltage then and then a 1.0 voltage thereafter (untit the
+	// supplying a 0.5 voltage then and then a 1.0 voltage thereafter (until the
 	// next spike).
         let mut euler: WithSpikeDecay<
             SpikeAtTimes<si::Second<f64>, si::Volt<f64>>,

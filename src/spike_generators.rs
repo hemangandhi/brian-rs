@@ -16,6 +16,8 @@ pub mod discrete {
 
     use dim::si;
 
+    use super::{SpikeGenerator, InputSpikeGenerator};
+
     #[derive(Debug)]
     pub struct SpikeAtTimes<T, I> {
         times: Vec<T>,
@@ -37,7 +39,7 @@ pub mod discrete {
         }
     }
 
-    impl<T, I> super::SpikeGenerator<I> for SpikeAtTimes<T, I>
+    impl<T, I> SpikeGenerator<I> for SpikeAtTimes<T, I>
     where
         // TODO: alias this as a trait?
         T: From<si::Second<f64>>
@@ -67,7 +69,7 @@ pub mod discrete {
         }
     }
 
-    impl<T, I> super::InputSpikeGenerator<I, T> for SpikeAtTimes<T, I>
+    impl<T, I> InputSpikeGenerator<I, T> for SpikeAtTimes<T, I>
     where
         // TODO: alias this as a trait?
         T: From<si::Second<f64>>
@@ -84,6 +86,57 @@ pub mod discrete {
                 self.idx += 1;
             }
         }
+    }
+
+    pub struct SpikeAtRate<T, I> {
+        rate_at_time: Box<dyn Fn(T) -> (i32, T)>,
+        time: T,
+        slot_start_time: T,
+        slot_end_time: T,
+        spike_current: I,
+        current_rate: i32,
+        num_spiked: i32,
+        tolerance: T,
+    }
+
+    impl<T, I> SpikeGenerator<I> for SpikeAtRate<T, I>
+    where
+        T: Into<si::Second<f64>> + Copy + std::ops::Sub<Output = T>,
+        I: From<si::Volt<f64>> + Copy,
+    {
+        fn did_spike(&self) -> bool {
+            let spike_interval_len: si::Second<f64> = ((self.slot_end_time - self.slot_start_time).into())
+                / (self.current_rate as f64);
+            spike_interval_len * (self.num_spiked as f64) < self.tolerance.into()
+        }
+
+        fn get_current(&self) -> I {
+            if self.did_spike() {
+                self.spike_current
+            } else {
+                (0.0 * si::V).into()
+            }
+        }
+    }
+
+    impl<T, I> InputSpikeGenerator<I, T> for SpikeAtRate<T, I>
+    where
+        T: Into<si::Second<f64>> + Copy + std::ops::Sub<Output = T> + std::ops::AddAssign + PartialOrd<T>,
+        I: From<si::Volt<f64>> + Copy,
+    {
+        fn advance(&mut self, dt: T) {
+	    self.time += dt;
+	    if self.time > self.slot_end_time {
+		self.slot_start_time = self.slot_end_time;
+		let (new_rate, new_end) = (*self.rate_at_time)(self.time);
+		self.current_rate = new_rate;
+		self.slot_end_time = new_end;
+		self.num_spiked = 0;
+	    }
+	    if self.did_spike() {
+		self.num_spiked += 1;
+	    }
+	}
     }
 }
 
