@@ -29,6 +29,7 @@ Some special non-terminals:
 | `value` | A literal value. Types will be explained later on. |
 | `equation` | A Rust expression. Usually should evaluate to the unit of the identifier. Special variables are noted where necessary. |
 | `condition` | A Rust expression that evaluates to `bool`. |
+| `fn body` | See below for details. This is a `fn(&self) -> ()` (where `Self` is a neuron or synapse). |
 
 ## Derivatives and Equations
 
@@ -39,7 +40,6 @@ The following are generally useful:
 ```
 list of types := <ident>: <type>, <list of types> | <ident>: <type>
 list of values := <ident>: <type> = <value>, <list of values> | <ident>: <type> = <value>
-list of eqns := <ident>: <eqn>, <list of eqns> | <ident>: <eqn>
 eqn := <ident or derivative> = <equation>
 ident or derivative := <ident> | <ident>'
 ```
@@ -47,29 +47,45 @@ ident or derivative := <ident> | <ident>'
 Derivatives are expected to be time derivatives and `x' = f(self)` evaluates to `let tmp_x = self.x + f(self) * dt; self.x = tmp_x;`
 where temporaries are assigned so that updates are consistent (otherwise ordering would be difficult if not incorrect).
 In general, `<list of eqns>` will have similar semantics where a temporary is made per left-hand-side identifier and then that
-identifier is assigned. Currently, you cannot make temporary variables among a list of eqns since the right-hand-side identifiers
-are assumed to be struct members. 
+identifier is assigned.
+
+### Temporary variables and the limits of `fn body`
+
+Really, `fn body` could likely be any Rust function body with a few special rules for scoping. There would be three sets of `ident`ifiers
+that should be handled in a special way:
+
+1. State parameters are the set of identifiers used to encapsulate a state of the system at a particular time.
+1. The values of the state parameters in the next step. These will be state parameters with a `~` prepended. This only exists after an equation with
+   the identifier on the left hand side.
+1. Derivative lvalues. This is `x'` where `x` is a state parameter.
+
+The first type of variables cannot be aliased. That is, if you have `v` in your state, you cannot assign to something called `v` (`let v` would not
+be allowed).
+
+Note: there is no `~x'` for "the time derivative of `x` in the next time step" since time derivatives are not explicitly stored.
+
+Otherwise, `let not_bound_in_state = f(non_state_stuff, state);` is a valid assignment.
 
 ## BNF for Neurons
 
 
 ```
-neuron := <type>, params {
+neuron := define_neuron!(<type>: params {
              <list of types>
-         },
+         }
          initialize {
             <list of values>
-         },
+         }
          time_step(<ident>, <ident>) {
-            <list of eqns>
-         },
+		    <fn body>
+         }
          spike_when {
             <condition>
-         },
-		 get_current { <equation> },
-         reset {
-            <list of eqns>
          }
+		 get_current { <equation> }
+         reset {
+		    <fn body>
+         })
 ```
 
 The two identifiers passed into `time_step` are the current and time step respectively.
@@ -92,18 +108,18 @@ define_neuron!(
         b: f64,
         c: f64,
         d: f64,
-    },
+    }
     initialize {
         v: f64 = c,
-        u: f64 = 0.
-    },
+        u: f64 = 0
+    }
 	get_current { v }
     time_step(I, dt) {
         //TODO: add units
         v' = 0.04 v * v + 5 * v + 140 - u + I;
         u' = a * (b * v - u);
-    },
-    spike_when { v > 30 * si::mV },
+    }
+    spike_when { v > 30 * si::mV }
     reset {
         v = c;
         u += d;
@@ -177,24 +193,24 @@ It must evaluate to a boolean. `reset` runs if `spike_when` returns true, but wi
 The meta-language is explained [above](#bnf-for-macros) as are [equations](#derivatives-and-equations).
 
 ```
-synapze := <type>, params {
+synapze := define_synapse!(<type> params {
              <list of types>
-         },
+         }
          initialize {
             <list of values>
-         },
+         }
 		 current_weight {
 		    <equation>
-		 },
+		 }
 		 on_pre {
-		    <list of epns>
+		    <fn body>
 		 }
 		 on_post {
-		    <list of eqns>
+		    <fn body>
 		 }
 		 time_step(<ident>, <ident>) {
-		    <list of eqns>
-		 }
+		    <fn body>
+		 })
 ```
 
 `on_pre` and `on_post` merely mutate the state of the synapse while the `current_weight` is a "getter". `time_step` is the same mutation as
