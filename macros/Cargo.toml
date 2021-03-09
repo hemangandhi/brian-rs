@@ -11,4 +11,4 @@ proc-macro = true
 dimensioned = "0.7.0"
 proc-macro2 = "1.0.24"
 quote = "1.0"
-syn = "1.0.62"
+syn = { version = "1.0.62", features = ["full"] }

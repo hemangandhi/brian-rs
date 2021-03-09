@@ -1,7 +1,7 @@
-use syn::{Expr, Ident, Type, Token, Error};
 use syn::braced;
 use syn::parse::{Parse, ParseStream, Result};
 use syn::punctuated::Punctuated;
+use syn::{Error, Expr, Ident, Token, Type};
 
 use proc_macro2::{Punct, Spacing, TokenStream};
 
@@ -138,6 +138,7 @@ impl Parse for IdentOrDerivative {
         let id: Ident = input.parse()?;
         let next = input.lookahead1();
         if next.peek(Token![@]) {
+            input.parse::<Token![@]>()?;
             Ok(IdentOrDerivative::Derivative(id))
         } else {
             Ok(IdentOrDerivative::Ident(id))
@@ -168,13 +169,24 @@ impl ToTokens for Equation {
             IdentOrDerivative::Derivative(i) => i,
             IdentOrDerivative::Ident(i) => i,
         };
+        tokens.append(proc_macro2::Ident::new("self", lhs.span()));
+        tokens.append(Punct::new('.', Spacing::Joint));
         lhs.to_tokens(tokens);
         tokens.append(Punct::new('=', Spacing::Alone));
-        self.right_side.to_tokens(tokens);
+        let mut rhs_tokens = TokenStream::new();
+        self.right_side.to_tokens(&mut rhs_tokens);
         if let IdentOrDerivative::Derivative(_) = self.left_side {
-            tokens.append(Punct::new('*', Spacing::Alone));
-            tokens.append(proc_macro2::Ident::new("dt", lhs.span()));
+            rhs_tokens.append(Punct::new('*', Spacing::Alone));
+            rhs_tokens.append(proc_macro2::Ident::new("dt", lhs.span()));
+            rhs_tokens.append(Punct::new('+', Spacing::Alone));
+            rhs_tokens.append(proc_macro2::Ident::new("self", lhs.span()));
+            rhs_tokens.append(Punct::new('.', Spacing::Joint));
+	    lhs.to_tokens(&mut rhs_tokens);
         }
+        tokens.append(proc_macro2::Group::new(
+            proc_macro2::Delimiter::Parenthesis,
+            rhs_tokens,
+        ));
         tokens.append(Punct::new(';', Spacing::Alone));
     }
 }
@@ -186,7 +198,7 @@ pub struct NeuronDef {
     pub time_step: Vec<Equation>,
     pub spike_when: Expr,
     pub current_getter: Expr,
-    pub reset: Vec<Equation>,
+    pub reset: Vec<Expr>,
 }
 
 impl Parse for NeuronDef {
@@ -203,16 +215,16 @@ impl Parse for NeuronDef {
         let spike_cond: Expr = {
             let spike_cond_toks;
             braced!(spike_cond_toks in input);
-            input.parse()?
+            spike_cond_toks.parse()?
         };
         expect_str(&input, "get_current")?;
         let current_getter: Expr = {
             let current_toks;
             braced!(current_toks in input);
-            input.parse()?
+            current_toks.parse()?
         };
         expect_str(&input, "reset")?;
-        let resets = get_delimited_within_braces::<Equation, Token![;]>(&input)?;
+        let resets = get_delimited_within_braces::<Expr, Token![;]>(&input)?;
         Ok(NeuronDef {
             neuron_type: typ,
             param_list: params,

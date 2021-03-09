@@ -4,14 +4,16 @@ pub mod synapses;
 #[cfg(test)]
 mod tests {
 
+    extern crate brian_rs_macros;
     extern crate dimensioned as dim;
+
     use dim::si;
     use std::vec;
 
     use super::spike_generators::{
         continuous::WithSpikeDecay,
         discrete::{SpikeAtRate, SpikeAtTimes},
-        InputSpikeGenerator, SpikeGenerator,
+        InnerSpikeGenerator, InputSpikeGenerator, SpikeGenerator,
     };
 
     #[test]
@@ -60,8 +62,8 @@ mod tests {
         } else if time < 2.0 * si::S {
             Option::Some((5, 2.0 * si::S))
         } else {
-	    Option::None
-	}
+            Option::None
+        }
     }
 
     #[test]
@@ -82,5 +84,23 @@ mod tests {
             rate_neuron.advance(0.1 * si::S);
         }
         assert_eq!(spike_count, 5);
+    }
+
+    brian_rs_macros::define_neuron! {
+    Izikhevich<si::Volt<f64>, si::Second<f64>>:
+    params {
+        a: f64, b: f64, c: f64, d: f64
+    }
+    initialize {
+        v: si::Volt<f64> = c * si::V;
+        u: si::Volt<f64> = 0.0 * si::V
+    }
+    time_step {
+        v @ = 0.04 * self.v * self.v / si::V + 5.0 * self.v + 140.0 * si::V - self.u + input / si::S;
+        u @ = (self.a * (self.b * self.v - self.u)) / si::S
+    }
+    spike_when { self.v > 30.0 * si::V }
+    get_current { self.v }
+    reset { self.v = self.c * si::V; self.u += self.d * si::V }
     }
 }
