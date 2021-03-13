@@ -23,4 +23,4 @@ jobs:
     - name: Build and test macros
       run: |
         cd macros/
-        cargo build --verbos
+        cargo build --verbose
