@@ -45,11 +45,11 @@ mod tests {
         for i in 0..30 {
             assert_eq!(euler.did_spike(), i == 5 || i == 10);
             if euler.did_spike() {
-                assert_eq!(euler.get_current(), 0.5 * si::V);
+                assert_eq!(euler.get_voltage(), 0.5 * si::V);
             } else if i > 5 {
-                assert_eq!(euler.get_current(), 1.0 * si::V);
+                assert_eq!(euler.get_voltage(), 1.0 * si::V);
             } else {
-                assert_eq!(euler.get_current(), 0.0 * si::V);
+                assert_eq!(euler.get_voltage(), 0.0 * si::V);
             }
             euler.advance(0.2 * si::S);
         }
@@ -100,7 +100,7 @@ mod tests {
         u @ = (self.a * (self.b * self.v - self.u)) / si::S
     }
     spike_when { self.v > 30.0 * si::V }
-    get_current { self.v }
+    get_voltage { self.v }
     reset { self.v = self.c * si::V; self.u += self.d * si::V }
     }
 }

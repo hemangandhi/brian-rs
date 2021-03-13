@@ -2,15 +2,26 @@ Rewrite of [Brian](https://brian2.readthedocs.io/en/stable/), the SNN library fr
 
 # Why
 
-1. Macros
-1. Types
+Using Brian in Python has two main pain-points:
 
-# TODO
+1. A lack of types makes it possible for a fully-trained model to abruptly crash, potentially wasting time.
+1. A lack of formality in the string-based specification of neurons adds some uncertainty about the correctness
+   of implementations.
+   
+This Rust crate hopes to fix these pain points by the power of Rust. In particular, this crate will:
 
-1. [x] Write the unit library as an external thing. -- TYVM [dimensioned](https://docs.rs/dimensioned/0.7.0/dimensioned/index.html)
-1. [ ] Design the neuron and synapse definition DSL
-1. [ ] Figure out monitors in a nice interface. `trait Monitor`? How to handle neuronal internal state?
-1. [ ] Implement the sick macros and builtins to make this rockin'
+1. support strongly-typed SNNs (where weights, neuronal activation functions, and other equations have proper units);
+1. include a DSL to specify neurons (and the differential equations that arise) readably, concisely, and, most of all, testably;
+1. and have feature-parity with Brain (where possible).
+
+## Why Rust
+
+| Programming language | Types? | Macros? | Conclusion |
+|---|---|---|---|
+| C++ | With C++20 concepts, this might be at parity with Rust | Nothing similar -- text-based macros are unsafe and template metaprogramming is not expressive enough | Does not have any way to add a DSL |
+| Java | Probably good enough (with some pain since there's no operator overloading) | Nothing similar to macros | No DSL support |
+| Lisps | Dynamically typed, so no additional guarantees | Very good DSL support | Type systems are too weak |
+| Haskell | Yes | Through template Haskell, most likely | A little too niche. Execution may limit opportunities for future work in targetting niche hardware too. |
 
 # BNF for the Macros
 

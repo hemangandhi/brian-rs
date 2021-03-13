@@ -20,7 +20,7 @@ pub fn define_neuron(input: TokenStream) -> TokenStream {
         initialize_list,
         time_step,
         spike_when,
-        current_getter,
+        voltage_getter,
         reset,
     } = parse_macro_input!(input as NeuronDef);
     let field_names: Vec<Ident> = param_list.iter().map(|i| i.name.clone()).collect();
@@ -29,10 +29,10 @@ pub fn define_neuron(input: TokenStream) -> TokenStream {
         .into_iter()
         .chain(initialize_list.clone().into_iter().map(|i| i.drop_value()))
         .collect();
-    // Note: current means electric current.
+    // Note: voltage means electric voltage.
     let NeuronType {
         type_name,
-        current_type,
+        voltage_type,
         time_type,
     } = neuron_type;
     let expanded = quote! {
@@ -49,13 +49,13 @@ pub fn define_neuron(input: TokenStream) -> TokenStream {
         }
     }
 
-    impl SpikeGenerator<#current_type> for #type_name {
+    impl SpikeGenerator<#voltage_type> for #type_name {
         fn did_spike(&self) -> bool { #spike_when }
-        fn get_current(&self) -> #current_type { #current_getter }
+        fn get_voltage(&self) -> #voltage_type { #voltage_getter }
     }
 
-    impl InnerSpikeGenerator<#current_type, #time_type> for #type_name {
-        fn handle_input(&mut self, input: #current_type, dt: #time_type) {
+    impl InnerSpikeGenerator<#voltage_type, #time_type> for #type_name {
+        fn handle_input(&mut self, input: #voltage_type, dt: #time_type) {
         if self.did_spike() { #(#reset);*; }
         #(#time_step);*;
     }

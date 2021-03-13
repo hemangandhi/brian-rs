@@ -38,7 +38,7 @@ fn get_delimited_within_braces<T: Parse, Delim: syn::token::Token + Parse>(
 
 pub struct NeuronType {
     pub type_name: Ident,
-    pub current_type: Type,
+    pub voltage_type: Type,
     pub time_type: Type,
 }
 
@@ -46,13 +46,13 @@ impl Parse for NeuronType {
     fn parse(input: ParseStream) -> Result<Self> {
         let type_name: Ident = input.parse()?;
         input.parse::<Token![<]>()?;
-        let current_type: Type = input.parse()?;
+        let voltage_type: Type = input.parse()?;
         input.parse::<Token![,]>()?;
         let time_type: Type = input.parse()?;
         input.parse::<Token![>]>()?;
         Ok(NeuronType {
             type_name,
-            current_type,
+            voltage_type,
             time_type,
         })
     }
@@ -115,11 +115,11 @@ impl Parse for IdentAndValue {
     }
 }
 
-// Note: there are two tokenizations here:
-// 1) drop_value(self).to_tokens(tokens) gives something apt for a
-//    forward declaration (ident: type, ie. in a fn param list)
-// 2) self.to_tokens(tokens) gives something apt for assignment
-//    (ident: value, ie. in a constructor).
+/// Note: there are two tokenizations here:
+/// 1) drop_value(self).to_tokens(tokens) gives something apt for a
+///    forward declaration (ident: type, ie. in a fn param list)
+/// 2) self.to_tokens(tokens) gives something apt for assignment
+///    (ident: value, ie. in a constructor for a struct).
 impl ToTokens for IdentAndValue {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         self.name.to_tokens(tokens);
@@ -197,7 +197,7 @@ pub struct NeuronDef {
     pub initialize_list: Vec<IdentAndValue>,
     pub time_step: Vec<Equation>,
     pub spike_when: Expr,
-    pub current_getter: Expr,
+    pub voltage_getter: Expr,
     pub reset: Vec<Expr>,
 }
 
@@ -217,11 +217,11 @@ impl Parse for NeuronDef {
             braced!(spike_cond_toks in input);
             spike_cond_toks.parse()?
         };
-        expect_str(&input, "get_current")?;
-        let current_getter: Expr = {
-            let current_toks;
-            braced!(current_toks in input);
-            current_toks.parse()?
+        expect_str(&input, "get_voltage")?;
+        let voltage_getter: Expr = {
+            let voltage_toks;
+            braced!(voltage_toks in input);
+            voltage_toks.parse()?
         };
         expect_str(&input, "reset")?;
         let resets = get_delimited_within_braces::<Expr, Token![;]>(&input)?;
@@ -231,7 +231,7 @@ impl Parse for NeuronDef {
             initialize_list: inits,
             time_step: time_steps,
             spike_when: spike_cond,
-            current_getter: current_getter,
+            voltage_getter: voltage_getter,
             reset: resets,
         })
     }
