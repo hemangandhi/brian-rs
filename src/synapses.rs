@@ -2,13 +2,11 @@ extern crate dimensioned as dim;
 
 use dim::dimensions;
 
-pub trait Synaptic{
-    type PreSynaptic;
-    type PostSynaptic;
+pub trait Synaptic<V, T>{
 
-    fn on_pre(&mut self);
-    fn on_post(&mut self);
+    fn on_pre(&mut self, input: V);
+    fn on_post(&mut self, input: V);
     fn current_weight(&self) -> f64;
 
-    fn advance_once(&mut self, dt: impl dimensions::Time);
+    fn advance_once(&mut self, dt: T);
 }

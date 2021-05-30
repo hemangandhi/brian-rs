@@ -204,24 +204,24 @@ It must evaluate to a boolean. `reset` runs if `spike_when` returns true, but wi
 The meta-language is explained [above](#bnf-for-macros) as are [equations](#derivatives-and-equations).
 
 ```
-synapze := define_synapse!(<type> params {
-             <list of types>
+synapse := define_synapse!(<type>: params {
+            <list of types>
          }
          initialize {
             <list of values>
          }
-		 current_weight {
-		    <equation>
-		 }
-		 on_pre {
-		    <fn body>
-		 }
-		 on_post {
-		    <fn body>
-		 }
-		 time_step(<ident>, <ident>) {
-		    <fn body>
-		 })
+         current_weight {
+            <equation>
+         }
+         on_pre (<ident>) {
+            <fn body>
+         }
+         on_post (<ident>) {
+            <fn body>
+         }
+         time_step(<ident>, <ident>) {
+            <fn body>
+         })
 ```
 
 `on_pre` and `on_post` merely mutate the state of the synapse while the `current_weight` is a "getter". `time_step` is the same mutation as

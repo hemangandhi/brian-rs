@@ -103,4 +103,28 @@ mod tests {
     get_voltage { self.v }
     reset { self.v = self.c * si::V; self.u += self.d * si::V }
     }
+
+    brian_rs_macros::define_synapse! {
+	StdpNeuron<si::Volt<f64>, si::Second<f64>>:
+	params {
+	    tau_pre: f64, tau_post: f64, w: f64, activation_bump: f64
+	}
+	initialize {
+	    a_pre: f64 = 0;
+	    a_post: f64 = 0
+	}
+	time_step {
+	    a_pre @ = - a_pre / tau_pre;
+	    a_post @ = - a_post / tau_post;
+	}
+	on_pre {
+	    a_pre += activation_bump;
+	    w += a_post
+	}
+	on_post {
+	    a_post += activation_bump;
+	    w += a_pre
+	}
+	weight_getter { w }
+    }
 }

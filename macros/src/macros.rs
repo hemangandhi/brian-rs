@@ -236,3 +236,45 @@ impl Parse for NeuronDef {
         })
     }
 }
+
+pub struct SynapseDef {
+    pub synapse_type: NeuronType,
+    pub param_list: Vec<IdentAndType>,
+    pub initialize_list: Vec<IdentAndValue>,
+    pub time_step: Vec<Equation>,
+    pub weight_getter: Expr,
+    pub pre_synapse_spike: Vec<Expr>,
+    pub post_synapse_spike: Vec<Expr>,
+}
+
+impl Parse for SynapseDef {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let typ: NeuronType = input.parse()?;
+        input.parse::<Token![:]>()?;
+        expect_str(&input, "params")?;
+        let params = get_delimited_within_braces::<IdentAndType, Token![,]>(&input)?;
+        expect_str(&input, "initialize")?;
+        let inits = get_delimited_within_braces::<IdentAndValue, Token![;]>(&input)?;
+        expect_str(&input, "time_step")?;
+        let time_steps = get_delimited_within_braces::<Equation, Token![;]>(&input)?;
+        expect_str(&input, "weight_getter")?;
+        let weight_getter: Expr = {
+            let weight_toks;
+            braced!(weight_toks in input);
+            weight_toks.parse()?
+        };
+        expect_str(&input, "on_pre")?;
+        let pre_spike = get_delimited_within_braces::<Expr, Token![;]>(&input)?;
+        expect_str(&input, "on_post")?;
+        let post_spike = get_delimited_within_braces::<Expr, Token![;]>(&input)?;
+        Ok(SynapseDef {
+            synapse_type: typ,
+            param_list: params,
+            initialize_list: inits,
+            time_step: time_steps,
+            weight_getter: weight_getter,
+            pre_synapse_spike: pre_spike,
+            post_synapse_spike: post_spike,
+        })
+    }
+}
