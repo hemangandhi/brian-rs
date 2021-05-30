@@ -166,27 +166,31 @@ impl Parse for Equation {
 impl ToTokens for Equation {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let lhs = match &self.left_side {
-            IdentOrDerivative::Derivative(i) => i,
+            IdentOrDerivative::Derivative(i) => {
+                i
+            }
             IdentOrDerivative::Ident(i) => i,
         };
         tokens.append(proc_macro2::Ident::new("self", lhs.span()));
         tokens.append(Punct::new('.', Spacing::Joint));
         lhs.to_tokens(tokens);
         tokens.append(Punct::new('=', Spacing::Alone));
-        let mut rhs_tokens = TokenStream::new();
-        self.right_side.to_tokens(&mut rhs_tokens);
-        if let IdentOrDerivative::Derivative(_) = self.left_side {
-            rhs_tokens.append(Punct::new('*', Spacing::Alone));
-            rhs_tokens.append(proc_macro2::Ident::new("dt", lhs.span()));
-            rhs_tokens.append(Punct::new('+', Spacing::Alone));
-            rhs_tokens.append(proc_macro2::Ident::new("self", lhs.span()));
-            rhs_tokens.append(Punct::new('.', Spacing::Joint));
-	    lhs.to_tokens(&mut rhs_tokens);
-        }
-        tokens.append(proc_macro2::Group::new(
+
+	let mut eqn_toks = TokenStream::new();
+	self.right_side.to_tokens(&mut eqn_toks);
+	tokens.append(proc_macro2::Group::new(
             proc_macro2::Delimiter::Parenthesis,
-            rhs_tokens,
+            eqn_toks,
         ));
+
+        if let IdentOrDerivative::Derivative(_) = self.left_side {
+            tokens.append(Punct::new('*', Spacing::Alone));
+            tokens.append(proc_macro2::Ident::new("dt", lhs.span()));
+            tokens.append(Punct::new('+', Spacing::Alone));
+            tokens.append(proc_macro2::Ident::new("self", lhs.span()));
+            tokens.append(Punct::new('.', Spacing::Joint));
+            lhs.to_tokens(tokens);
+        }
         tokens.append(Punct::new(';', Spacing::Alone));
     }
 }

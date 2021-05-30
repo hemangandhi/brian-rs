@@ -104,7 +104,7 @@ pub fn define_synapse(input: TokenStream) -> TokenStream {
     impl Synaptic<#voltage_type, #time_type> for #type_name {
         fn on_pre(&mut self, input: #voltage_type) { #(#pre_synapse_spike);*; }	    
         fn on_post(&mut self, input: #voltage_type) { #(#post_synapse_spike);*; }
-	fn current_weight(&mut self) -> f64 { #weight_getter }
+	fn current_weight(&self) -> f64 { #weight_getter }
 
 	fn advance_once(&mut self, dt: #time_type) {
             #(#time_step);*;

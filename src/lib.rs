@@ -1,7 +1,8 @@
 pub mod spike_generators;
 pub mod synapses;
 
-#[cfg(test)]
+
+// #[cfg(test)]
 mod tests {
 
     extern crate brian_rs_macros;
@@ -15,6 +16,7 @@ mod tests {
         discrete::{SpikeAtRate, SpikeAtTimes},
         InnerSpikeGenerator, InputSpikeGenerator, SpikeGenerator,
     };
+    use super::synapses::Synaptic;
 
     #[test]
     fn spike_generator_at_times() {
@@ -96,8 +98,8 @@ mod tests {
         u: si::Volt<f64> = 0.0 * si::V
     }
     time_step {
-        v @ = 0.04 * self.v * self.v / si::V + 5.0 * self.v + 140.0 * si::V - self.u + input / si::S;
-        u @ = (self.a * (self.b * self.v - self.u)) / si::S
+        v @ = (0.04 * self.v * self.v / si::V + 5.0 * self.v + 140.0 * si::V - self.u + input) / si::S;
+        u @ = self.a * (self.b * self.v - self.u) / si::S
     }
     spike_when { self.v > 30.0 * si::V }
     get_voltage { self.v }
@@ -107,24 +109,24 @@ mod tests {
     brian_rs_macros::define_synapse! {
 	StdpNeuron<si::Volt<f64>, si::Second<f64>>:
 	params {
-	    tau_pre: f64, tau_post: f64, w: f64, activation_bump: f64
+	    tau_pre: f64, tau_post: f64, w: si::Unitless<f64>, activation_bump: f64
 	}
 	initialize {
-	    a_pre: f64 = 0;
-	    a_post: f64 = 0
+	    a_pre: si::Unitless<f64> = 0.0 * si::S / si::S;
+	    a_post: si::Unitless<f64> = 0.0 * si::S / si::S
 	}
 	time_step {
-	    a_pre @ = - a_pre / tau_pre;
-	    a_post @ = - a_post / tau_post;
+	    a_pre @ = - (self.a_pre / self.tau_pre) / si::S;
+	    a_post @ = - (self.a_post / self.tau_post) / si::S
 	}
+	weight_getter { *self.w }
 	on_pre {
-	    a_pre += activation_bump;
-	    w += a_post
+	    self.a_pre += self.activation_bump;
+	    self.w += self.a_post
 	}
 	on_post {
-	    a_post += activation_bump;
-	    w += a_pre
+	    self.a_post += self.activation_bump;
+	    self.w += self.a_pre
 	}
-	weight_getter { w }
     }
 }

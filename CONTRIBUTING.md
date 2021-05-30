@@ -11,7 +11,7 @@ There's a few things you should know before you try to:
 1. Github
 1. Some software engineering terms (CI, unit testing, end-to-end testing)
 
-Once you do, this should not be to hard. If you'd like to learn any of these by contributing here, feel free
+Once you do, this should not be too hard. If you'd like to learn any of these by contributing here, feel free
 to -- just know that the best way to get help is to ask, so if you want to add a feature, mention what you
 don't know while requesting the feature (or requesting to contribute to the feature).
 
@@ -19,7 +19,7 @@ don't know while requesting the feature (or requesting to contribute to the feat
 
 This repo will use issues, forks, and feature branches.
 
-There will eventually be a CI action for the unit tests.
+There is a CI action for the unit tests.
 
 ## The Repo Layout
 
@@ -41,3 +41,6 @@ There are hopes to add a third crate consisting solely of examples (so an applic
 Cargo does everything.
 
 The tests live in the `lib.rs` files so far.
+
+In order to debug the macros, you will also need nightly rust (so it might be best to just have that).
+`cargo expand` is really helpful to see what the macros become (once you install nightly rust).
